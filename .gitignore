@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+env/
+.tox/
+.coverage
+# 3rd party app engine endpoints libraries
+lib/
