@@ -1,0 +1,15 @@
+- Refactor get_articles and get_links into Class object
+- Order crawl by count - Article.query().order(-Article.count).fetch(20)
+- Use jinja2 templates?
+- Setup tests
+
+<---- Extracted from code --->
+<---- Don't edit below this line. Will be overwritten--->
+main.py:42:    # TODO: Check for existing article and increase count
+main.py:47:    # TODO: validate url
+main.py:52:    # TODO: validate url
+main.py:87:    # TODO: look at this attempt at  a recursive function later
+main.py:106:   # TODO: Specify datastore root entity
+main.py:115:   # TODO: refactor into recursive function
+main.py:127:   # TODO: add parent
+main.py:137:   article = Article(url=link_url, title=link[1])  # TODO: parent
