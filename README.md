@@ -30,3 +30,5 @@ Deploy
 ------
 
     gcloud app deploy app.yaml
+
+Demo deployed to: https://scrape--wiki.appspot.com/
