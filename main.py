@@ -1,4 +1,3 @@
-import urlparse
 import logging
 
 import tornado.web
@@ -30,16 +29,6 @@ TEMPLATE = """
 logger = logging.getLogger(__name__)
 
 
-def get_sheet_id(url):
-    path = urlparse.urlsplit(url).path
-    try:
-        sheet_id = path.split('/')[3]
-    except IndexError:
-        logger.exception('url passed is {}'.format(url))
-        sheet_id = ''
-    return sheet_id
-
-
 def is_url():
     # TODO: validate url
     pass
@@ -55,11 +44,13 @@ def get_article(url):
 
 
 def get_links(article):
+    ''' Get all links in wikipedia article
+    '''
     links = []
     start_tag = '<a href="/wiki'
     end_tag = '">'
-    for text in article.split("</a>"):
-        if "<a href" in text:
+    for text in article.split('</a>'):
+        if '<a href' in text:
             try:
                 ind = text.index(start_tag)
                 text = text[ind+len(start_tag):]
@@ -68,10 +59,17 @@ def get_links(article):
                 pass
             else:
                 link = text[:end]
-                a = link.split('title')
-                logger.info(a)
-                links.append(text[:end])
+                # articles have titles, class=mw-redirect are not articles too
+                if 'title=' in link and 'class' not in link:
+                    a = tuple(link.split('" title="'))
+                    logger.info(a)
+                    # logger.info('url: {}, title: {}'.format(url, title))
+                    links.append(a)
     return links
+
+
+def follow(link):
+    pass
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -82,7 +80,9 @@ class MainHandler(tornado.web.RequestHandler):
         url = self.get_argument('article')
         article_text = get_article(url)
         links = get_links(article_text)
-        self.write(''.join(links))
+        # first 6 links
+        for link in links[:6]:
+            self.write(link[0])
 
 
 app = tornado.web.Application([
