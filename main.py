@@ -1,7 +1,7 @@
 import logging
-from collections import defaultdict
-
 import json
+import urlparse
+from collections import defaultdict
 
 from google.appengine.ext import ndb
 
@@ -62,22 +62,27 @@ def tree():
     return defaultdict(tree)
 
 
-def is_url():
+def is_wiki_article(url):
     '''Returns True if url is valid
     '''
     # TODO: validate url
-    pass
+    result = urlparse.urlsplit(url)
+    if 'wikipedia.org' in result.hostname and result.path.startswith('/wiki/'):
+        return True
+    return False
 
 
 def get_article(url):
     '''Return wikipedia article text
     '''
     # TODO: validate url
-    try:
-        article = requests.get(url)
-        return article.text
-    except requests.exceptions.RequestException as e:
-        logger.error(e)
+    if is_wiki_article(url):
+        try:
+            article = requests.get(url)
+            return article.text
+        except requests.exceptions.RequestException as e:
+            logger.error(e)
+    return 'Not a wiki article'
 
 
 def get_links(article):
@@ -112,23 +117,13 @@ class MainHandler(tornado.web.RequestHandler):
     '''
 
     # TODO: create recursive function
-    def follow(self, url, depth=3):
+    def follow_recurse(self, url, depth=3):
         '''Recursively follow links'''
         pass
 
-    def get(self):
-        self.write(TEMPLATE)
-        self.write('<br><hr><br>')
-        articles = Article.query().order(-Article.count).fetch()
-        for article in articles:
-            self.write('<li>{}</li>'.format(str(article)))
-
-    def post(self):
-        '''Handle post request
+    def follow(self, url, l=6):
+        '''Follow upto 6 links
         '''
-        l = 1
-        url = self.get_argument('article')
-
         article_text = get_article(url)
         links = get_links(article_text)
 
@@ -155,27 +150,46 @@ class MainHandler(tornado.web.RequestHandler):
                     root['url'][l1[0]][i2]['title'] = l2[1]
                     root['title'] = l1[1]
 
-        self.write('<pre>{}</pre>'.format(
-            json.dumps(scraped, sort_keys=True, indent=2)))
+        return scraped
 
-        uniques = ['Article.url.%s' % url, ]
-        success, existing = Unique.create_multi(uniques)
+    def get(self):
+        self.write(TEMPLATE)
+        self.write('<br><hr><br>')
+        articles = Article.query().order(-Article.count).fetch()
+        for article in articles:
+            self.write('<li>{}</li>'.format(str(article)))
 
-        if success:
+    def post(self):
+        '''Handle post request
+        '''
+        url = self.get_argument('article')
 
-            logger.info('New article being scraped: {}'.format(url))
-            article = Article(
-                url=url,
-                scraped=json.loads(json.dumps(scraped))
-            )
-            article.put()
+        if is_wiki_article(url):
+            scraped = self.follow(url)
+
+            self.write('<pre>{}</pre>'.format(
+                json.dumps(scraped, sort_keys=True, indent=2)))
+
+            uniques = ['Article.url.%s' % url, ]
+            success, existing = Unique.create_multi(uniques)
+
+            if success:
+
+                logger.info('New article being scraped: {}'.format(url))
+                article = Article(
+                    url=url,
+                    scraped=json.loads(json.dumps(scraped))
+                )
+                article.put()
+            else:
+                logger.info('property %r not unique' % existing)
+                query = Article.query(Article.url == url).get()
+                logger.info(query)
+                article_id = query.key.id()
+                increment(article_id)
+                logger.info('counter incremented')
         else:
-            logger.info('property %r not unique' % existing)
-            query = Article.query(Article.url == url).get()
-            logger.info(query)
-            article_id = query.key.id()
-            increment(article_id)
-            logger.info('counter incremented')
+            self.write('Provide a valid wiki article')
 
 
 app = tornado.web.Application([
