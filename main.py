@@ -1,4 +1,7 @@
 import logging
+from collections import defaultdict
+
+import json
 
 import tornado.web
 
@@ -39,10 +42,17 @@ class Article(ndb.Model):
     '''Datastore Article entity model
     '''
     url = ndb.StringProperty()
-    title = ndb.StringProperty(required=False)
+    # title = ndb.StringProperty(required=False)
+    scraped = ndb.JsonProperty()
 
     # TODO: Check for existing article and increase count
     # use https://github.com/jeffgodwyll/qod-api/blob/master/main.py#L50 as base
+
+
+def tree():
+    ''' Returns tree data structure of a dict with trees as default values
+    '''
+    return defaultdict(tree)
 
 
 def is_url():
@@ -94,73 +104,63 @@ class MainHandler(tornado.web.RequestHandler):
     '''Homepage request handler
     '''
 
-    # TODO: look at this attempt at  a recursive function later
-    # def follow(self, url, depth=3):
-    #     article_text = get_article(url)
-    #     links = get_links(article_text)
-    #     # follow first 6 links
-    #     while depth > 0:
-    #         for link in links[:6]:
-    #             self.write('<br>')
-    #             self.write(link[0])
-    #             self.write('<br>')
-    #             logger.info(link[0])
-    #             link_url = BASE_URL % link[0]
-    #             self.follow(link_url, depth)
-    #         depth -= 1
-    #         # self.follow(link_url, depth)
+    # TODO: create recursive function
+    def follow(self, url, depth=3):
+        '''Recursively follow links'''
+        pass
 
     def get(self):
         self.write(TEMPLATE)
-
-    # TODO: Specify datastore root entity
-    # root = Article()
-    # root.url = url
-    # root_key = root.put()
+        self.write('<br>')
+        self.write('<br>')
+        self.write('<hr>')
+        articles = Article.query().fetch()
+        self.write(str(articles))
 
     def post(self):
         '''Handle post request
         '''
+        l = 6
         url = self.get_argument('article')
         article_text = get_article(url)
         links = get_links(article_text)
+
+        scraped = tree()
+
         # TODO: refactor into recursive function
         # first 6 links
+        for i, l1 in enumerate(links[:l]):
 
-        # level_1 = []
-        # level_2 = []
-        for link in links[:6]:
+            '''self.write('<br>')
+            self.write('<br>')
+            self.write('* ' + l1[0])
+            self.write('<br>')'''
 
-            self.write('<br>')
-            self.write('<br>')
-            self.write('* ' + link[0])
-            self.write('<br>')
-
-            # TODO: add parent
             # check if url has been scraped already and increase count in model
             # entity use ff transaction as base:
             # https://github.com/jeffgodwyll/qod-api/blob/master/main.py#L50
-            article = Article(url=url, title=link[1])
-            article.put()
-            link_url = BASE_URL % link[0]
-            link_text = get_article(link_url)
+            l1_url = BASE_URL % l1[0]
+            link_text = get_article(l1_url)
             child_links = get_links(link_text)
-            for link in child_links[:6]:
-                article = Article(url=link_url, title=link[1])  # TODO: parent
-                article.put()
-                self.write('<br>')
-                self.write('<br>')
-                self.write('** ' + link[0])
-                # level_2.append(link1[0])
-                self.write('<br>')
-                link_url = BASE_URL % link[0]
-                link_text = get_article(link_url)
+            for i2, l2 in enumerate(child_links[:l]):
+                l2_url = BASE_URL % l2[0]
+                link_text = get_article(l2_url)
                 child_links2 = get_links(link_text)
-                for link in child_links2[:6]:
-                    article = Article(url=link_url, title=link[1])
-                    article.put()
-                    self.write('<br>')
-                    self.write('*** ' + link[0])
+
+                for i3, l3 in enumerate(child_links2[:l]):
+
+                    scraped['root'][url][i]['url'][l1[0]][i2]['url'][l2[0]][i3]['url'] = l3[0]
+                    scraped['root'][url][i]['url'][l1[0]][i2]['url'][l2[0]][i3]['title'] = l3[1]
+                    scraped['root'][url][i]['url'][l1[0]][i2]['title'] = l2[1]
+                    scraped['root'][url][i]['title'] = l1[1]
+
+        self.write('<pre>{}</pre>'.format(
+            json.dumps(scraped, sort_keys=True, indent=2)))
+        article = Article(
+            url=url,
+            scraped=json.loads(json.dumps(scraped))
+        )
+        article.put()
 
 
 app = tornado.web.Application([
