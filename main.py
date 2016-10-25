@@ -44,15 +44,7 @@ class Article(ndb.Model):
     url = ndb.StringProperty()
     # title = ndb.StringProperty(required=False)
     scraped = ndb.JsonProperty()
-    count = ndb.IntegerProperty(default=0)
-
-
-def get_count():
-    '''value counter'''
-    total = 0
-    for counter in Article.query():
-        total += counter
-    return total
+    count = ndb.IntegerProperty(default=1)
 
 
 # TODO: implement actual shard?
@@ -127,13 +119,14 @@ class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.write(TEMPLATE)
         self.write('<br><hr><br>')
-        articles = Article.query().fetch()
-        self.write(str(articles))
+        articles = Article.query().order(-Article.count).fetch()
+        for article in articles:
+            self.write('<li>{}</li>'.format(str(article)))
 
     def post(self):
         '''Handle post request
         '''
-        l = 6
+        l = 1
         url = self.get_argument('article')
 
         article_text = get_article(url)
@@ -178,11 +171,11 @@ class MainHandler(tornado.web.RequestHandler):
             article.put()
         else:
             logger.info('property %r not unique' % existing)
-            article = Article.query(Article.url == url).get()
-            article_id = article.key.id()
+            query = Article.query(Article.url == url).get()
+            logger.info(query)
+            article_id = query.key.id()
             increment(article_id)
             logger.info('counter incremented')
-            print article
 
 
 app = tornado.web.Application([
